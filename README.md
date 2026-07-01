@@ -1,6 +1,55 @@
 # tf-molecule-apigateway-cors-responses-aws
 
-Terraform molecule (PlatformStackPulse). See the module documentation below.
+Terraform molecule that installs CORS-aware **API Gateway Gateway Responses** for the
+`DEFAULT_4XX` and `DEFAULT_5XX` response types on a REST API. These fire when API Gateway
+itself returns an error (e.g. auth failures, throttling, 5xx) *before* your Lambda
+integration executes — so the browser still receives the `Access-Control-Allow-*` headers
+and the real error surfaces instead of an opaque CORS failure.
+
+## Features
+
+- Adds `aws_api_gateway_gateway_response` for both `DEFAULT_4XX` and `DEFAULT_5XX`.
+- Injects `Access-Control-Allow-Origin`, `Access-Control-Allow-Headers`, and
+  `Access-Control-Allow-Methods` on gateway-generated error responses.
+- Uses `Access-Control-Allow-Origin: '*'` at the gateway layer (the header only accepts a
+  single origin or `*`); Lambda handlers can still reflect the actual request origin on
+  success responses.
+- Configurable allowed headers and methods via `allowed_headers` / `allowed_methods`.
+- [tf-label](https://github.com/PlatformStackPulse/tf-label) naming/tagging context with an
+  `enabled` flag to conditionally create nothing.
+
+## Usage
+
+```hcl
+module "cors_responses" {
+  source = "git::https://github.com/PlatformStackPulse/tf-molecule-apigateway-cors-responses-aws.git?ref=v1.0.0"
+
+  # tf-label identity
+  namespace = "eg"
+  stage     = "prod"
+  name      = "api"
+
+  # required
+  rest_api_id = aws_api_gateway_rest_api.this.id
+
+  # optional CORS tuning
+  allowed_headers = "Content-Type,Authorization,X-Amz-Date,X-Api-Key"
+  allowed_methods = "GET,POST,PUT,DELETE,OPTIONS"
+}
+```
+
+## Tests
+
+Unit tests live in `tests/unit/` and run against a mock AWS provider (no credentials, no
+real resources). They assert on plan-known values only (tf-label id, resource counts, input
+pass-throughs).
+
+```bash
+terraform init -backend=false
+terraform test -test-directory=tests/unit
+# or
+make test-unit
+```
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
